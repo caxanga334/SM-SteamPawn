@@ -5,12 +5,20 @@
 #include <sourcemod>
 
 #include <sdktools>
+// Mark dhooks as optional since it's not available for Linux x64 yet
+#undef REQUIRE_EXTENSIONS
 #include <dhooks>
+#define REQUIRE_EXTENSIONS
 
 #include <stocksoup/convars>
 #include <stocksoup/memory>
 
+#tryinclude <virtual_address>
+
 #pragma newdecls required
+
+#define ARCH_X86 0
+#define ARCH_X64 1
 
 #define PLUGIN_VERSION "1.2.0"
 public Plugin myinfo = {
@@ -44,18 +52,62 @@ public APLRes AskPluginLoad2(Handle hPlugin, bool late, char[] error, int maxlen
 }
 
 public void OnPluginStart() {
-	Handle hGameConf = LoadGameConfigFile("steampawn");
+	GameData hGameConf = new GameData("steampawn");
 	if (!hGameConf) {
 		SetFailState("Failed to load gamedata (steampawn).");
 	}
 	
-	g_DHookRestartRequested = DHookCreateFromConf(hGameConf,
-			"ISteamGameServer::WasRestartRequested()");
-	if (!g_DHookRestartRequested) {
-		SetFailState("Failed to create virtual hook for "
-				... "ISteamGameServer::WasRestartRequested()");
+	bool isDhooksAvailable = LibraryExists("dhooks");
+
+	if (isDhooksAvailable) {
+		g_DHookRestartRequested = DHookCreateFromConf(hGameConf,
+				"ISteamGameServer::WasRestartRequested()");
+		if (!g_DHookRestartRequested) {
+			SetFailState("Failed to create virtual hook for "
+					... "ISteamGameServer::WasRestartRequested()");
+		}
+	}
+	else {
+		LogMessage("Dhooks is not available, SteamPawn_OnRestartRequested forward won't be called.");
+	}
+
+	int arch = hGameConf.GetOffset("Arch");
+
+	if (arch == -1) {
+		SetFailState("Failed to determine the server's architecture. "
+				... "SteamPawn's gamedata file may be outdated!");
+	}
+
+#if defined _virtual_address_included
+
+	StartPrepSDKCall(SDKCall_Static);
+	PrepSDKCall_SetFromConf(hGameConf, SDKConf_Signature, "Steam3Server()");
+	PrepSDKCall_SetReturnInfo(SDKType_VirtualAddress, SDKPass_Plain);
+	g_SDKCallGetSteam3Server = EndPrepSDKCall();
+	if (!g_SDKCallGetSteam3Server) {
+		g_pSteam3Server = GameConfGetAddress(hGameConf, "s_Steam3Server");
+		if (!g_pSteam3Server) {
+			SetFailState("Failed to get address to Steam3Server instance");
+		}
+	} else {
+		g_pSteam3Server = SDKCall(g_SDKCallGetSteam3Server);
 	}
 	
+	StartPrepSDKCall(SDKCall_VirtualAddress);
+	PrepSDKCall_SetFromConf(hGameConf, SDKConf_Virtual, "ISteamGameServer::BLoggedOn()");
+	PrepSDKCall_SetReturnInfo(SDKType_Bool, SDKPass_Plain);
+	g_SDKCallIsLoggedOn = EndPrepSDKCall();
+	if (!g_SDKCallIsLoggedOn) {
+		SetFailState("Failed to initialize SDKCall to ISteamGameServer::BLoggedOn()");
+	}
+
+#else
+	// No virtual address (IE: compiled against SM 1.12)
+
+	if (arch == ARCH_X64) {
+		SetFailState("Virtual Addresses (SM 1.13+) is required for x64!");
+	}
+
 	StartPrepSDKCall(SDKCall_Static);
 	PrepSDKCall_SetFromConf(hGameConf, SDKConf_Signature, "Steam3Server()");
 	PrepSDKCall_SetReturnInfo(SDKType_PlainOldData, SDKPass_Plain);
@@ -76,6 +128,8 @@ public void OnPluginStart() {
 	if (!g_SDKCallIsLoggedOn) {
 		SetFailState("Failed to initialize SDKCall to ISteamGameServer::BLoggedOn()");
 	}
+
+#endif
 	
 	g_pnFakeIP = GameConfGetAddress(hGameConf, "g_nFakeIP");
 	g_parFakePorts = GameConfGetAddress(hGameConf, "g_arFakePorts");
@@ -86,8 +140,10 @@ public void OnPluginStart() {
 	
 	delete hGameConf;
 	
-	Address pSteamGameServer = GetSteamGameServer();
-	DHookRaw(g_DHookRestartRequested, true, pSteamGameServer, .callback = OnRestartRequested);
+	if (g_DHookRestartRequested != null) {
+		Address pSteamGameServer = GetSteamGameServer();
+		DHookRaw(g_DHookRestartRequested, true, pSteamGameServer, .callback = OnRestartRequested);
+	}
 	
 	g_FwdRestartRequested = CreateGlobalForward("SteamPawn_OnRestartRequested", ET_Ignore);
 	
@@ -100,6 +156,8 @@ MRESReturn OnRestartRequested(Address pSteamGameServer, Handle hReturn) {
 		Call_StartForward(g_FwdRestartRequested);
 		Call_Finish();
 	}
+
+	return MRES_Ignored;
 }
 
 int Native_IsSteamConnected(Handle plugin, int argc) {
@@ -135,5 +193,5 @@ int GetSDRFakePort(int num) {
 	if (!g_parFakePorts || num < 0 || num >= g_nFakePorts) {
 		return 0;
 	}
-	return LoadFromAddress(g_parFakePorts + (num * 0x2), NumberType_Int16);
+	return LoadFromAddress(g_parFakePorts + view_as<Address>((num * 0x2)), NumberType_Int16);
 }
