@@ -71,6 +71,11 @@ public void OnPluginStart() {
 		LogMessage("Dhooks is not available, SteamPawn_OnRestartRequested forward won't be called.");
 	}
 
+
+
+#if !defined _virtual_address_included
+	// No virtual address (IE: compiled against SM 1.12)
+
 	int arch = hGameConf.GetOffset("Arch");
 
 	if (arch == -1) {
@@ -78,11 +83,18 @@ public void OnPluginStart() {
 				... "SteamPawn's gamedata file may be outdated!");
 	}
 
-#if defined _virtual_address_included
+	if (arch == ARCH_X64) {
+		SetFailState("Virtual Addresses (SM 1.13+) is required for x64!");
+	}
+#endif
 
 	StartPrepSDKCall(SDKCall_Static);
 	PrepSDKCall_SetFromConf(hGameConf, SDKConf_Signature, "Steam3Server()");
+#if defined _virtual_address_included
 	PrepSDKCall_SetReturnInfo(SDKType_VirtualAddress, SDKPass_Plain);
+#else
+	PrepSDKCall_SetReturnInfo(SDKType_PlainOldData, SDKPass_Plain);
+#endif
 	g_SDKCallGetSteam3Server = EndPrepSDKCall();
 	if (!g_SDKCallGetSteam3Server) {
 		g_pSteam3Server = GameConfGetAddress(hGameConf, "s_Steam3Server");
@@ -93,6 +105,11 @@ public void OnPluginStart() {
 		g_pSteam3Server = SDKCall(g_SDKCallGetSteam3Server);
 	}
 	
+#if defined _virtual_address_included
+	StartPrepSDKCall(SDKCall_VirtualAddress);
+#else
+	StartPrepSDKCall(SDKCall_Raw);
+#endif
 	StartPrepSDKCall(SDKCall_VirtualAddress);
 	PrepSDKCall_SetFromConf(hGameConf, SDKConf_Virtual, "ISteamGameServer::BLoggedOn()");
 	PrepSDKCall_SetReturnInfo(SDKType_Bool, SDKPass_Plain);
@@ -100,36 +117,6 @@ public void OnPluginStart() {
 	if (!g_SDKCallIsLoggedOn) {
 		SetFailState("Failed to initialize SDKCall to ISteamGameServer::BLoggedOn()");
 	}
-
-#else
-	// No virtual address (IE: compiled against SM 1.12)
-
-	if (arch == ARCH_X64) {
-		SetFailState("Virtual Addresses (SM 1.13+) is required for x64!");
-	}
-
-	StartPrepSDKCall(SDKCall_Static);
-	PrepSDKCall_SetFromConf(hGameConf, SDKConf_Signature, "Steam3Server()");
-	PrepSDKCall_SetReturnInfo(SDKType_PlainOldData, SDKPass_Plain);
-	g_SDKCallGetSteam3Server = EndPrepSDKCall();
-	if (!g_SDKCallGetSteam3Server) {
-		g_pSteam3Server = GameConfGetAddress(hGameConf, "s_Steam3Server");
-		if (!g_pSteam3Server) {
-			SetFailState("Failed to get address to Steam3Server instance");
-		}
-	} else {
-		g_pSteam3Server = SDKCall(g_SDKCallGetSteam3Server);
-	}
-	
-	StartPrepSDKCall(SDKCall_Raw);
-	PrepSDKCall_SetFromConf(hGameConf, SDKConf_Virtual, "ISteamGameServer::BLoggedOn()");
-	PrepSDKCall_SetReturnInfo(SDKType_Bool, SDKPass_Plain);
-	g_SDKCallIsLoggedOn = EndPrepSDKCall();
-	if (!g_SDKCallIsLoggedOn) {
-		SetFailState("Failed to initialize SDKCall to ISteamGameServer::BLoggedOn()");
-	}
-
-#endif
 	
 	g_pnFakeIP = GameConfGetAddress(hGameConf, "g_nFakeIP");
 	g_parFakePorts = GameConfGetAddress(hGameConf, "g_arFakePorts");
