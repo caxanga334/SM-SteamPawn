@@ -130,13 +130,6 @@
 				"windows"	"11"
 				"windows64"	"11"
 			}
-			"Arch" // Used for arch detection
-			{
-				"linux"		"0"
-				"windows"	"0"
-				"linux64"	"1"
-				"windows64"	"1"
-			}
 		}
 		"Keys"
 		{

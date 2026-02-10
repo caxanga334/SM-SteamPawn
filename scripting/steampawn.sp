@@ -3,7 +3,7 @@
  */
 #pragma semicolon 1
 #include <sourcemod>
-
+#include <virtual_address>
 #include <sdktools>
 // Mark dhooks as optional since it's not available for Linux x64 yet
 #undef REQUIRE_EXTENSIONS
@@ -13,12 +13,7 @@
 #include <stocksoup/convars>
 #include <stocksoup/memory>
 
-#tryinclude <virtual_address>
-
 #pragma newdecls required
-
-#define ARCH_X86 0
-#define ARCH_X64 1
 
 #define PLUGIN_VERSION "1.2.0"
 public Plugin myinfo = {
@@ -71,33 +66,12 @@ public void OnPluginStart() {
 		LogMessage("Dhooks is not available, SteamPawn_OnRestartRequested forward won't be called.");
 	}
 
-
-
-#if !defined _virtual_address_included
-	// No virtual address (IE: compiled against SM 1.12)
-
-	int arch = hGameConf.GetOffset("Arch");
-
-	if (arch == -1) {
-		SetFailState("Failed to determine the server's architecture. "
-				... "SteamPawn's gamedata file may be outdated!");
-	}
-
-	if (arch == ARCH_X64) {
-		SetFailState("Virtual Addresses (SM 1.13+) is required for x64!");
-	}
-#endif
-
 	StartPrepSDKCall(SDKCall_Static);
 	PrepSDKCall_SetFromConf(hGameConf, SDKConf_Signature, "Steam3Server()");
-#if defined _virtual_address_included
 	PrepSDKCall_SetReturnInfo(SDKType_VirtualAddress, SDKPass_Plain);
-#else
-	PrepSDKCall_SetReturnInfo(SDKType_PlainOldData, SDKPass_Plain);
-#endif
 	g_SDKCallGetSteam3Server = EndPrepSDKCall();
 	if (!g_SDKCallGetSteam3Server) {
-		g_pSteam3Server = GameConfGetAddress(hGameConf, "s_Steam3Server");
+		g_pSteam3Server = hGameConf.GetAddress("s_Steam3Server");
 		if (!g_pSteam3Server) {
 			SetFailState("Failed to get address to Steam3Server instance");
 		}
@@ -105,11 +79,6 @@ public void OnPluginStart() {
 		g_pSteam3Server = SDKCall(g_SDKCallGetSteam3Server);
 	}
 	
-#if defined _virtual_address_included
-	StartPrepSDKCall(SDKCall_VirtualAddress);
-#else
-	StartPrepSDKCall(SDKCall_Raw);
-#endif
 	StartPrepSDKCall(SDKCall_VirtualAddress);
 	PrepSDKCall_SetFromConf(hGameConf, SDKConf_Virtual, "ISteamGameServer::BLoggedOn()");
 	PrepSDKCall_SetReturnInfo(SDKType_Bool, SDKPass_Plain);
@@ -118,11 +87,11 @@ public void OnPluginStart() {
 		SetFailState("Failed to initialize SDKCall to ISteamGameServer::BLoggedOn()");
 	}
 	
-	g_pnFakeIP = GameConfGetAddress(hGameConf, "g_nFakeIP");
-	g_parFakePorts = GameConfGetAddress(hGameConf, "g_arFakePorts");
+	g_pnFakeIP = hGameConf.GetAddress("g_nFakeIP");
+	g_parFakePorts = hGameConf.GetAddress("g_arFakePorts");
 	
 	char strNumFakePorts[4];
-	GameConfGetKeyValue(hGameConf, "NumFakePorts", strNumFakePorts, sizeof(strNumFakePorts));
+	hGameConf.GetKeyValue("NumFakePorts", strNumFakePorts, sizeof(strNumFakePorts));
 	g_nFakePorts = StringToInt(strNumFakePorts);
 	
 	delete hGameConf;
