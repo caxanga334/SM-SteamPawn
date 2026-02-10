@@ -23,11 +23,6 @@
 					"signature"	"CSteam3Server::OnFakeIPResults()"
 					"read"		"37"
 				}
-				"windows64"
-				{
-					"signature"	"CSteam3Server::OnFakeIPResults()"
-					"read"		"37"
-				}
 			}
 			"g_arFakePorts"
 			{
@@ -44,11 +39,6 @@
 					"signature"	"CSteam3Server::OnFakeIPResults()"
 					"read"		"135"
 				}
-				"windows64"
-				{
-					"signature"	"CSteam3Server::OnFakeIPResults()"
-					"read"		"147"
-				}
 			}
 			"s_Steam3Server"
 			{
@@ -56,12 +46,6 @@
 				{
 					"signature"	"sv_setsteamaccount_f()"
 					"read"		"5"
-					"offset"	"-4"
-				}
-				"windows64"
-				{
-					"signature"	"sv_setsteamaccount_f()"
-					"read"		"12"
 					"offset"	"-4"
 				}
 			}
