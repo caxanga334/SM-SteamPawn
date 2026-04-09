@@ -10,7 +10,6 @@
 #define REQUIRE_EXTENSIONS
 
 #include <stocksoup/convars>
-#include <stocksoup/memory>
 
 #pragma newdecls required
 
@@ -134,7 +133,7 @@ int Native_GetSDRFakePort(Handle plugin, int argc) {
 }
 
 Address GetSteamGameServer() {
-	return DereferencePointer(g_pSteam3Server + 0x04);
+	return LoadAddressFromAddress(g_pSteam3Server + 0x04);
 }
 
 int GetSDRFakeIP() {
