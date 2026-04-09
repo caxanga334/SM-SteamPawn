@@ -3,7 +3,6 @@
  */
 #pragma semicolon 1
 #include <sourcemod>
-#include <virtual_address>
 #include <sdktools>
 // Mark dhooks as optional since it's not available for Linux x64 yet
 #undef REQUIRE_EXTENSIONS
@@ -68,7 +67,7 @@ public void OnPluginStart() {
 
 	StartPrepSDKCall(SDKCall_Static);
 	PrepSDKCall_SetFromConf(hGameConf, SDKConf_Signature, "Steam3Server()");
-	PrepSDKCall_SetReturnInfo(SDKType_VirtualAddress, SDKPass_Plain);
+	PrepSDKCall_SetReturnInfo(SDKType_Address, SDKPass_Plain);
 	g_SDKCallGetSteam3Server = EndPrepSDKCall();
 	if (!g_SDKCallGetSteam3Server) {
 		g_pSteam3Server = hGameConf.GetAddress("s_Steam3Server");
@@ -76,10 +75,10 @@ public void OnPluginStart() {
 			SetFailState("Failed to get address to Steam3Server instance");
 		}
 	} else {
-		g_pSteam3Server = SDKCall(g_SDKCallGetSteam3Server);
+		SDKCall(g_SDKCallGetSteam3Server, g_pSteam3Server);
 	}
 	
-	StartPrepSDKCall(SDKCall_VirtualAddress);
+	StartPrepSDKCall(SDKCall_Raw);
 	PrepSDKCall_SetFromConf(hGameConf, SDKConf_Virtual, "ISteamGameServer::BLoggedOn()");
 	PrepSDKCall_SetReturnInfo(SDKType_Bool, SDKPass_Plain);
 	g_SDKCallIsLoggedOn = EndPrepSDKCall();
@@ -135,7 +134,7 @@ int Native_GetSDRFakePort(Handle plugin, int argc) {
 }
 
 Address GetSteamGameServer() {
-	return DereferencePointer(g_pSteam3Server + view_as<Address>(0x04));
+	return DereferencePointer(g_pSteam3Server + 0x04);
 }
 
 int GetSDRFakeIP() {
@@ -149,5 +148,5 @@ int GetSDRFakePort(int num) {
 	if (!g_parFakePorts || num < 0 || num >= g_nFakePorts) {
 		return 0;
 	}
-	return LoadFromAddress(g_parFakePorts + view_as<Address>((num * 0x2)), NumberType_Int16);
+	return LoadFromAddress(g_parFakePorts + (num * 0x2), NumberType_Int16);
 }
